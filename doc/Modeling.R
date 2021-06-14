@@ -5,11 +5,13 @@ knitr::opts_chunk$set(
 )
 
 ## ----setup--------------------------------------------------------------------
-library(GradientMatricsSubmission)
-library(dplyr)
+library(GradientMetrics)
+# library(dplyr)
+library(tidyverse)
 library(MASS)
 library(ordinal)
 # library(glmmLasso)
+library(highcharter)
 library(nnet)
 library(cvms)
 library(ggeffects)
@@ -59,7 +61,7 @@ test_model_data = model_data %>%
 mlr <- multinom(answer ~ duration + offer + outcome + price+rtb+social_proof, 
           data = train_model_data, Hess=TRUE)
 ## view a summary of the model
-summary(mlr) # AIC=17219.9
+summary(mlr) # AIC=22248.33
 ctable <- coef(summary(mlr))
 
 ## calculate and store p values
@@ -104,22 +106,22 @@ conf_mat <- confusion_matrix(targets = mlr_predictions$actual,
 plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]],
                       add_sums = TRUE)
 print("accuracy")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[1]] # accuracy:0.4714419
 print("precision")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[2]] # precision
 print("recall")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[3]] # recall
 print("F1 score")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[4]] # f1
 
 ## ---- echo = FALSE------------------------------------------------------------
 olr <- polr(answer ~ duration + offer + outcome + price+rtb+social_proof, 
           data = train_model_data, Hess=TRUE)
-summary(olr)# AIC: 17209.22 
+summary(olr)# AIC: 22225.68 
 
 ctable <- coef(summary(olr))
 ## calculate and store p values
@@ -162,46 +164,100 @@ conf_mat <- confusion_matrix(targets = olr_predictions$actual,
 plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]],
                       add_sums = TRUE)
 print("Accuracy")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[1]] # accuracy:0.4274345
 print("Precision")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[2]] # precision
 print("Recall")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[3]] # recall
 print("F1 Score")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[4]] # f1
 
-## -----------------------------------------------------------------------------
+## ---- echo= FALSE-------------------------------------------------------------
+table(exp_data$answer)
 
-library(cluster)    # clustering algorithms
-library(factoextra) # clustering algorithms & visualization
+## ---- echo=FALSE--------------------------------------------------------------
+data("experiment_data")
+
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
+                        grouping_var = "duration",
+                        index_var = "answer") %>% 
+  mutate(grouping_var2 = grouping_var)
+GradientMetrics::dist_bar_chart(data = employment_age,
+               index_var_names = "Duration ",
+               index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
+               title = "Rating Distribution by duration")
+
+## -----------------------------------------------------------------------------
+library(poLCA)
 survey_data3 = survey_data
 survey_data3[is.na(survey_data3)] <- 0
 
-cols = names(survey_data3)
-survey_data3[cols] <- lapply(survey_data[cols], factor) 
+# f1 = as.formula(cbind(d_urban,s_gender,s_race,d_education,s_hhincome,s_problem)~1)
+f2 = as.formula(cbind(source_1,source_4,source_5,source_6,source_7,source_8,source_9,source_10,source_11,source_12,source_13,source_14,source_15,source_16,source_17)~1)
 
-set.seed(123)
-kmeans = kmeans(survey_data3[,c(2,3,4,5, 6,7)], 5)
-survey_data3$cluster = kmeans$cluster
+source_df = survey_data3 %>% dplyr::select(contains("source"))
+source_df[(source_df==1)] <- 2
+source_df[(source_df==0)] <- 1
+LCA1 = poLCA(f2,data = source_df,nclass=3,nrep = 10,verbose = FALSE)
+plot(LCA1)
 
-train_model_data2 = train_model_data %>% left_join(survey_data3 %>% dplyr::select(response_id,cluster),on = c("response_id"="response_id"))
-test_model_data2 = test_model_data %>% left_join(survey_data3 %>% dplyr::select(response_id,cluster),on = c("response_id"="response_id"))
+survey_data3$cluster_source = LCA1$predclass
+train_model_data2 = train_model_data %>% 
+  left_join(survey_data3 %>% 
+  dplyr::select(response_id,cluster_source),on = c("response_id"="response_id")) %>% 
+  mutate(duration = factor(duration,levels = c("3 months","6 months","12 months")),
+    price = factor(price,levels = c("$20/month","$30/month","$40/month"))
+  )
+test_model_data2 = test_model_data %>% 
+  left_join(survey_data3 %>% 
+  dplyr::select(response_id,cluster_source),on = c("response_id"="response_id")) %>% 
+  mutate(duration = factor(duration,levels = c("3 months","6 months","12 months")),
+    price = factor(price,levels = c("$20/month","$30/month","$40/month"))
+  )
 
-# The run-time for training of the below model is too long & I saved the model coefficients & information in the ./data folder
-# model7 = clmm(answer~duration+offer+outcome+price+rtb+social_proof+(1|cluster),
-#                link='logit',
-#                data= exp_data2 %>%
-#                  mutate(answer = ordered(answer, levels = c("1", "2", "3","4"))),
-#                Hess=TRUE, nAGQ=1)
-# summary(model7)
+# fitLCA <- function(k){
+#   poLCA(cbind(m1_philosophy_1, m1_philosophy_2, m1_philosophy_3,
+#                    m1_philosophy_4, m1_philosophy_5, m1_philosophy_6,
+#                    m1_philosophy_7, m1_philosophy_8, m1_philosophy_9)~1, 
+#         data=survey_data, nclass = k, nrep=10)
+# }
+# # Apply the function to successively increasingly classes K=1,2,3....,6
+# MK <- lapply(1:6, fitLCA)
+# # Possible to look at AIC, BIC, etc.
+# sapply(MK, `[[`, "aic")
+# sapply(MK, `[[`, "bic")
 
-data("model7_info")
-data("model7_coef")
 
-model7_coef
-model7_info
+## -----------------------------------------------------------------------------
+library(ordinal)
+model7 = clmm(answer~duration+offer+outcome+price+rtb+social_proof+(1|cluster_source),
+               link='logit',
+               data= train_model_data2,
+               Hess=TRUE, nAGQ=1)
+summary(model7) # AIC = 21757.87
+ctable = coef(summary(model7))
+ctable
+
+## -----------------------------------------------------------------------------
+data.frame(
+  Predictors = c("duration","offer","outcome","price","rtb","social_proof"),
+  Baseline_Level = c("3 months","give you the energy to unlock your fullest potential",
+                     "breaking bad habits and creating new routines","$20/month",
+                     "a program created just for you","a method that has helped thousands")
+)
+
+
+## -----------------------------------------------------------------------------
+data.frame(
+  model = c("Multinomial Logistic Regression", "Ordinal Logistic Regression", "Ordinal Mixed Effect Model"),
+  AIC = c(round(summary(mlr)$AIC,2),
+          round(olr$deviance,2),
+          summary(model7)$info["AIC"] %>% pull())
+  
+)
+
 

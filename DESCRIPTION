@@ -14,7 +14,7 @@ Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
-Imports: dplyr,ggplot2,haven,purrr,magrittr,highcharter,labelled,data.table,MASS,ordinal,poLCA,ggeffects
+Imports: dplyr,ggplot2,haven,purrr,magrittr,highcharter,labelled,data.table,cvms,MASS,ordinal,poLCA,ggeffects
 Suggests: 
     knitr,
     rmarkdown

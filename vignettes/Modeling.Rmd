@@ -19,9 +19,8 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(GradientMetrics)
-# library(dplyr)
 library(tidyverse)
-library(MASS)
+library(MASS,exclude = "select")
 library(ordinal)
 # library(glmmLasso)
 library(highcharter)
@@ -90,7 +89,6 @@ where \\
 \alpha_j = \text{intercept} \\
 \beta_j \text{ is a vector of regression coefficients for j=1,2,...,J−1}$$
 ```{r, echo = FALSE}
-
 mlr <- multinom(answer ~ duration + offer + outcome + price+rtb+social_proof, 
           data = train_model_data, Hess=TRUE)
 ## view a summary of the model
@@ -412,7 +410,7 @@ data.frame(
 
 ```
 
-## Further Improvement
+## Future Improvement
 Ideally, a K-folder cross validation should be use to train, validate and test the model, where out-of-sample performance metrics can be calculated to evaluate the accuracy of the predictions.
 
 Group Lasso

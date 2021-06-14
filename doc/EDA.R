@@ -5,7 +5,7 @@ knitr::opts_chunk$set(
 )
 
 ## ----setup--------------------------------------------------------------------
-library(GradientMatricsSubmission)
+library(GradientMetrics)
 #library(pacman)
 library(dplyr)
 library(tidyverse)
@@ -30,29 +30,29 @@ dem_data =  survey_data2 %>%
 names(dem_data)
 
 ## -----------------------------------------------------------------------------
-GradientMatricsSubmission::pie_chart(data = dem_data,
+GradientMetrics::pie_chart(data = dem_data,
                   var = "d_urban",
                   var_levels = c(1,2,3),
                   var_level_names = c("Urban","Suburban","Rural"))
 
 
 ## -----------------------------------------------------------------------------
-GradientMatricsSubmission::pie_chart(data = dem_data,
+GradientMetrics::pie_chart(data = dem_data,
                   var = "s_race",
                   var_levels = c(1,2,3,4,5),
                   var_level_names = c("White","African American/Black/Caribbean American","Asian or Pacific Islander","Mixed race and other","Hispanic or Latino"))
 
 ## -----------------------------------------------------------------------------
-GradientMatricsSubmission::pie_chart(data = dem_data,
+GradientMetrics::pie_chart(data = dem_data,
                                      var = "d_education",
                                      var_levels = setDT(val_labels(survey_data$d_education) %>% data.frame(), keep.rownames = TRUE)[]$`.`,
                                      var_level_names = setDT(val_labels(survey_data$d_education) %>% data.frame(), keep.rownames = TRUE)[]$`rn`
                                      )
 
 ## -----------------------------------------------------------------------------
-GradientMatricsSubmission::index_func(data=dem_data,grouping_var="s_gender",index_var="s_age")
+GradientMetrics::index_func(data=dem_data,grouping_var="s_gender",index_var="s_age")
 
-employment_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= dem_data,
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= dem_data,
                         grouping_var = "d_employment",
                         index_var = "s_age") %>% 
   mutate(grouping_var2 =case_when(
@@ -67,14 +67,14 @@ employment_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= dem_da
     grouping_var == "9" ~ "Other",
     TRUE ~ NA_character_
   ))
-GradientMatricsSubmission::dist_bar_chart(data = employment_age,
+GradientMetrics::dist_bar_chart(data = employment_age,
                index_var_names = "Age Group ",
                index_var_levels = c("18-30","31-45","46-64","65+"),
                title = "Age Distribution by Employment Status")
 
 ## -----------------------------------------------------------------------------
 # Urban & Age
-urban_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= dem_data,
+urban_age = GradientMetrics::dist_bar_chart_dataPrep(data= dem_data,
                                          grouping_var = "d_urban",
                                          index_var = "s_age") %>% 
   mutate(grouping_var2 =case_when(
@@ -88,26 +88,25 @@ urban_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= dem_data,
 # index_var_names = "Age Group " 
 # title = "Age Distribution by Employment Status"
 
-GradientMatricsSubmission::dist_bar_chart(data = urban_age,
+GradientMetrics::dist_bar_chart(data = urban_age,
                index_var_names = "Age Group ",
                index_var_levels = c("18-30","31-45","46-64","65+"),
                title = "Age Distribution by Urban Status")
 
 ## -----------------------------------------------------------------------------
 survey_philosophy <- survey_data %>%
-  select(response_id, contains('m1_philosophy'))
+  dplyr::select(response_id, contains('m1_philosophy'))
 
 
 philosophy_m1_bar_chart(data = survey_philosophy,
-                        qs_levels = setDT(val_labels(survey_philosophy$m1_philosophy_1) %>% data.frame(), 
-                                                 keep.rownames = TRUE)[]$`rn`)
+                        qs_levels = setDT(val_labels(survey_philosophy$m1_philosophy_1) %>% data.frame(), keep.rownames = TRUE)[]$`rn`)
 
 
 ## -----------------------------------------------------------------------------
 # whether customers have heard of any sleep apps
 survey_awareness <-
   survey_data %>%
-  select(response_id, contains('m2_awareness'))
+  dplyr::select(response_id, contains('m2_awareness'))
 # participants all selected at lease 1 option
 survey_awareness %>% filter_all(all_vars(is.na(.))) # 0 row
 
@@ -142,45 +141,64 @@ hc = highchart() %>%
 hc
 
 ## -----------------------------------------------------------------------------
-exp_data %>% head()
-employment_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= exp_data,
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "duration",
                         index_var = "answer") %>% 
   mutate(grouping_var2 = grouping_var)
-GradientMatricsSubmission::dist_bar_chart(data = employment_age,
+GradientMetrics::dist_bar_chart(data = employment_age,
                index_var_names = "Duration ",
                index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
                title = "Rating Distribution by duration")
 
 ## -----------------------------------------------------------------------------
-employment_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= exp_data,
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "price",
                         index_var = "answer") %>% 
   mutate(grouping_var2 = grouping_var)
-GradientMatricsSubmission::dist_bar_chart(data = employment_age,
+GradientMetrics::dist_bar_chart(data = employment_age,
                index_var_names = "Price ",
                index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
                title = "Rating Distribution by price")
 
 ## -----------------------------------------------------------------------------
-employment_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= exp_data,
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "offer",
                         index_var = "answer") %>% 
   mutate(grouping_var2 = grouping_var)
-GradientMatricsSubmission::dist_bar_chart(data = employment_age,
+GradientMetrics::dist_bar_chart(data = employment_age,
                index_var_names = "offer ",
                index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
                title = "Rating Distribution by offer")
 
 ## -----------------------------------------------------------------------------
-employment_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= exp_data,
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "outcome",
                         index_var = "answer") %>% 
   mutate(grouping_var2 = grouping_var)
-GradientMatricsSubmission::dist_bar_chart(data = employment_age,
+GradientMetrics::dist_bar_chart(data = employment_age,
                index_var_names = "outcome ",
                index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
                title = "Rating Distribution by outcome")
+
+## -----------------------------------------------------------------------------
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
+                        grouping_var = "rtb",
+                        index_var = "answer") %>% 
+  mutate(grouping_var2 = grouping_var)
+GradientMetrics::dist_bar_chart(data = employment_age,
+               index_var_names = "Reason to Buy ",
+               index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
+               title = "Rating Distribution by rtb")
+
+## -----------------------------------------------------------------------------
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
+                        grouping_var = "social_proof",
+                        index_var = "answer") %>% 
+  mutate(grouping_var2 = grouping_var)
+GradientMetrics::dist_bar_chart(data = employment_age,
+               index_var_names = "Social Proof ",
+               index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
+               title = "Rating Distribution by Social Proof")
 
 ## -----------------------------------------------------------------------------
 exp_data %>% group_by(duration, offer , outcome , price,rtb,social_proof) %>% summarise(n = n(),
