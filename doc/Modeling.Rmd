@@ -1,0 +1,312 @@
+---
+title: "Modeling"
+output: 
+  rmarkdown::html_vignette:
+   self_contained: yes
+   mode: selfcontained
+vignette: >
+  %\VignetteIndexEntry{Modeling}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(GradientMatricsSubmission)
+library(dplyr)
+library(MASS)
+library(ordinal)
+# library(glmmLasso)
+library(nnet)
+library(cvms)
+library(ggeffects)
+```
+
+## Data Processing
+
+The goal of the modeling process is to answer the question: how each attribute (and its level) affects the likelihood of downloading of the app. In other words, I need to build statistical models that model the effects of each independent variables (a.k.a. each attribute) on the response variable (paricipant's lieklihood of download, on a rating-based scale). 
+
+Given the limited computation power I have using my personal laptop, I merged the rating level 2 and 3 together (which both represents a relatively hesitant attitude towards downloading the app) after examining the overall distribution of the rating, in order to accelerate the training process:  
+```{r}
+data("survey_data") 
+data("experiment_data")
+table(exp_data$answer)
+
+model_data = exp_data %>% 
+  mutate(
+    response_id = as.factor(response_id),
+    answer = ordered(answer, levels = c("1", "2", "3","4")),
+    offer = as.factor(offer),
+    outcome = as.factor(outcome),
+    rtb= as.factor(rtb),
+    social_proof = as.factor(social_proof),
+    duration = factor(duration,levels = c("3 months","6 months","12 months")),
+    price = factor(price,levels = c("$20/month","$30/month","$40/month"))
+  ) %>% 
+  dplyr::select(-c(task)) #response_id
+
+# merge categories in response variable
+# model_data2 = model_data %>% 
+#   mutate(answer = case_when(
+#     answer == 1 ~ 1,
+#     answer %in% c(2,3) ~ 2,
+#     answer == 4 ~ 3
+#   ),
+#   answer =  ordered(answer, levels = c("1", "2", "3")),
+#   duration = factor(duration,levels = c("3 months","6 months","12 months")),
+#   price = factor(price,levels = c("$20/month","$30/month","$40/month"))
+#   )
+# 
+# table(model_data2$answer)
+# # 3 levels
+IDs = unique(model_data$response_id)
+set.seed(123)
+train_model_data = model_data %>%
+  filter(response_id %in% sample(IDs,round(0.8*length(IDs),0)))
+test_model_data = model_data %>%
+  filter(!(response_id %in% sample(IDs,round(0.8*length(IDs),0))))
+# str(model_data2$duration)
+```
+
+I also splitted the entire experiment data into training and testing set, by randomly select 80% of the participant into training dataset and the remaining 20% of the participants to the testing dataset. This is equivalent to a 1-folder validation, where I can train the model on the training set and evaluate the performance of the model on the testing set. 
+
+Ideally, a K-folder cross validation should be use to train, validate and test the model, where out-of-sample performance metrics can be calculated to evaluate the accuracy of the predictions. 
+
+## Multinomial Regression
+(https://stats.idre.ucla.edu/r/dae/multinomial-logistic-regression/)
+(https://data.princeton.edu/wws509/notes/c6.pdf)
+Multinomial logistic regression is used to model nominal outcome variables, in which the log odds of the outcomes are modeled as a linear combination of the predictor variables. It's a extension of binary logistic regression that allows for more than two categories for the dependent variable. Similar to binary logistic regression, it uses maximum likelihood estimation to evaluate the probability of belonging to a specific category. 
+
+However, multinomial regression does not address the ordinal structure of the response variable in the data. Therefore, it can serve as a baseline model to compare the performance with ordinal logistic regression model (presented in the next section). 
+
+Mathematically, with p number of independent variables and response variable Y with categories j = 1,...,J, the algorithm selects 1 response category as base level and form odds of remaining J-1 categories against this level: 
+
+$$log(\frac{\pi_{ij}}{\pi_{iJ}}) = \alpha_{j}+x_i'\beta_{j}\\ 
+where \\
+\pi_{ij} = P(Y_i = j) \\
+\alpha_j = \text{intercept} \\
+\beta_j \text{ is a vector of regression coefficients for j=1,2,...,J−1}$$
+```{r, echo = FALSE}
+
+mlr <- multinom(answer ~ duration + offer + outcome + price+rtb+social_proof, 
+          data = train_model_data, Hess=TRUE)
+## view a summary of the model
+summary(mlr) # AIC=17219.9
+ctable <- coef(summary(mlr))
+
+## calculate and store p values
+#p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+
+z <- summary(mlr)$coefficients/summary(mlr)$standard.errors
+# 2-tailed Wald z tests to test significance of coefficients
+p <- (1 - pnorm(abs(z), 0, 1)) * 2
+
+## combined table
+# ctable <- cbind(ctable, "p value" = p)
+
+# CI
+# ci <- confint(m2)
+# ci
+
+## OR and CI
+# exp(cbind(OR = coef(m2), ci))
+
+# performance evaluation
+Phat = predict(mlr, newdata = test_model_data, type="p") %>% 
+  as.data.frame()
+mlr_predictions = colnames(Phat)[apply(Phat,1,which.max)] %>% 
+  cbind(test_model_data$answer) %>% 
+  as.data.frame() %>% 
+  rename("prediction" = ".", "actual"="V2") %>% 
+  mutate(match = ifelse(prediction == actual,1,0))
+sum(mlr_predictions$match)/nrow(mlr_predictions) # 0.4274345 (0.4714419: 3-level): proportion of correct pred on test set
+```
+
+
+**Interpretation of the model results:**
+By looking at the coefficients of the fitted multinomial logistic regression model, I noticed that the base level of the response is answer = 1/Very Likely. Therefore: 
+
+* Duration:
+  + The log odds of being in rating 2 vs. in rating 1 will change by `r ctable[1,2]` when comparing duration="6 months" to duration="3 months". 
+  + The log odds of being in rating 3 vs. in rating 1 will change by `r ctable[2,2]` when comparing duration="6 months" to duration="3 months". 
+  + The log odds of being in rating 4 vs. in rating 1 will change by `r ctable[3,2]` when comparing duration="6 months" to duration="3 months". 
+  + The log odds of being in rating 2 vs. in rating 1 will change by `r ctable[1,3]` when comparing duration="12 months" to duration="3 months". 
+  + The log odds of being in rating 3 vs. in rating 1 will change by `r ctable[2,3]` when comparing duration="12 months" to duration="3 months". 
+  + The log odds of being in rating 4 vs. in rating 1 will change by `r ctable[3,3]` when comparing duration="12 months" to duration="3 months". 
+  
+* Price:
+  + The log odds of being in rating 2 vs. in rating 1 will change by `r ctable[1,10]` when comparing price="\$30/month" to price="\$20/month". 
+  + The log odds of being in rating 3 vs. in rating 1 will change by `r ctable[2,10]` when comparing price="\$30/month" to price="\$20/month".  
+  + The log odds of being in rating 4 vs. in rating 1 will change by `r ctable[3,10]` when comparing price="\$30/month" to price="\$20/month".  
+  + The log odds of being in rating 2 vs. in rating 1 will change by `r ctable[1,11]` when comparing price="\$40/month" to price="\$20/month".   
+  + The log odds of being in rating 3 vs. in rating 1 will change by `r ctable[2,11]` when comparing price="\$40/month" to price="\$20/month".   
+  + The log odds of being in rating 4 vs. in rating 1 will change by `r ctable[3,11]` when comparing price="\$40/month" to price="\$20/month".  
+  
+Similar interpretation can be generated for the remaining of the predictors. The baseline level for each categorical variables are the following:
+```{r}
+data.frame(
+  Predictors = c("duration","offer","outcome","price","rtb","social_proof"),
+  Baseline_Level = c("3 months","give you the energy to unlock your fullest potential",
+                     "breaking bad habits and creating new routines","$20/month",
+                     "a program created just for you","a method that has helped thousands")
+)
+
+```
+**Model Performance:**
+Confusion matrix of the multinomial model is presented below, along with out-of-sample accuracy, precision, recall and F1 score: 
+```{r, echo = FALSE}
+conf_mat <- confusion_matrix(targets = mlr_predictions$actual,
+                             predictions = mlr_predictions$prediction)
+plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]],
+                      add_sums = TRUE)
+print("accuracy")
+GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+                          targets = mlr_predictions$actual)[[1]] # accuracy:0.4714419
+print("precision")
+GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+                          targets = mlr_predictions$actual)[[2]] # precision
+print("recall")
+GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+                          targets = mlr_predictions$actual)[[3]] # recall
+print("F1 score")
+GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+                          targets = mlr_predictions$actual)[[4]] # f1
+```
+
+As we can see, the model has little power in distinguishing likelihood of donwload based on message attributes using a multinomial model. More details is discussed in Section Further Improvement. 
+
+# Ordinal Logistic Regression Model
+Ordinal logistic regression is used to determine the relationship between a set of predictors and an ordered factor dependent variable (such as rating). In ordinal logistic regression, the levels within the dependent variable is assumed to have a ordinal features, such as rating 1 is one-step higher than rating 2, and it's 2-step higher than rating 3. In contrast to multinomial regression, where there is NO ordinal structure for the levels within the dependent variable (such as y %in% c("apple","orange","pear")).
+
+$$logit[P(Y \leq j)] = \alpha_j - \beta x, j = 1 ... J-1$$
+
+
+$$Thus,P(Y \leq j) = \frac{exp(\alpha_j - \beta x)}{1+exp(\alpha_j - \beta x)}, j = 1 ... J-1$$
+where $\alpha_j$ is the threshold coefficient corresponding to the particular rating, $\beta$ is the variable coefficient corresponding to a change in a predictor variable, and $x$ is the value of the predictor variable. 
+
+```{r, echo = FALSE}
+olr <- polr(answer ~ duration + offer + outcome + price+rtb+social_proof, 
+          data = train_model_data, Hess=TRUE)
+summary(olr)# AIC: 17209.22 
+
+ctable <- coef(summary(olr))
+## calculate and store p values
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+
+## combined table
+ctable <- cbind(ctable, "p value" = p)
+
+
+# CI
+# ci <- confint(m)
+# ci
+# 
+# ## OR and CI
+# exp(cbind(OR = coef(m), ci))
+
+# performance evaluation
+Phat = predict(olr, newdata = test_model_data, type="p") %>% 
+  as.data.frame()
+olr_predictions = colnames(Phat)[apply(Phat,1,which.max)] %>% 
+  cbind(test_model_data$answer) %>% 
+  as.data.frame() %>% 
+  rename("prediction" = ".", "actual"="V2") %>% 
+  mutate(match = ifelse(prediction == actual,1,0))
+sum(olr_predictions$match)/nrow(olr_predictions) # 0.4274345 (0.4639513 3-level): proportion of correct pred on test set
+
+```
+
+**Interpretation of the model results:**
+*Duration:
+  + Compared to duration = 3 months, 6-month duration will cause the likelihood 
+  of a rating 4 vs. a rating 1-3 change by `r ctable[1,1]` on the log odds scale, 
+  and same amount of changes will happen to the likelihood of a rating 3 vs. a rating 1-2 \& the likelihood of a rating 2 vs. a rating 1
+  + Compared to duration = 3 months, 12-month duration will cause the likelihood 
+  of a rating 4 vs. a rating 1-3 change by `r ctable[2,1]` on the log odds scale, 
+  and same amount of changes will happen to the likelihood of a rating 3 vs. a rating 1-2 \& the likelihood of a rating 2 vs. a rating 1
+
+*Price:
+  + Compared to price = \$20/month, \$30/month will cause the likelihood 
+  of a rating 4 vs. a rating 1-3 change by `r ctable[9,1]` on the log odds scale, 
+  and same amount of changes will happen to the likelihood of a rating 3 vs. a rating 1-2 \& the likelihood of a rating 2 vs. a rating 1
+  + Compared to price = \$20/month, \$40/month will cause the likelihood 
+  of a rating 4 vs. a rating 1-3 change by `r ctable[10,1]` on the log odds scale, 
+  and same amount of changes will happen to the likelihood of a rating 3 vs. a rating 1-2 \& the likelihood of a rating 2 vs. a rating 1
+
+Similar interpretation can be generated for the remaining of the predictors. The baseline level for each categorical variables are the following:
+```{r}
+data.frame(
+  Predictors = c("duration","offer","outcome","price","rtb","social_proof"),
+  Baseline_Level = c("3 months","give you the energy to unlock your fullest potential",
+                     "breaking bad habits and creating new routines","$20/month",
+                     "a program created just for you","a method that has helped thousands")
+)
+
+```
+
+**Model Performance:**
+Confusion matrix of the multinomial model is presented below, along with out-of-sample accuracy, precision, recall and F1 score: 
+```{r}
+conf_mat <- confusion_matrix(targets = olr_predictions$actual,
+                             predictions = olr_predictions$prediction)
+plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]],
+                      add_sums = TRUE)
+print("Accuracy")
+GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+                          targets = olr_predictions$actual)[[1]] # accuracy:0.4274345
+print("Precision")
+GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+                          targets = olr_predictions$actual)[[2]] # precision
+print("Recall")
+GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+                          targets = olr_predictions$actual)[[3]] # recall
+print("F1 Score")
+GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+                          targets = olr_predictions$actual)[[4]] # f1
+```
+Similar to multinomial regression model, the ordinal model has little power in distinguishing likelihood of donwload based on message attributes. More details is discussed in Section Further Improvement. 
+
+# Ordinal Mixed Effect Model
+Given the fact that each participants were randomly given 12 permutations of the message attributes, each participants has 12 observations, each corresponding to his/her rating for download likelihood. The previous 2 models did NOT account for the random effect within the data. Ordinal mixed effect model (specifically, cumulative link mixed model) can address this issue. 
+(https://math.montana.edu/grad_students/writing-projects/2012/12schmidt.pdf)
+The  assumption  of  independence  of  observations  applies  to  all  regression  models. When multiple measurements are taken on the same individual, this assumption is violated. In order to account for dependent observations, a random effect can be added to the previous model. Cumulative link mixed models have the following general form:
+
+```{r}
+
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+survey_data3 = survey_data
+survey_data3[is.na(survey_data3)] <- 0
+
+cols = names(survey_data3)
+survey_data3[cols] <- lapply(survey_data[cols], factor) 
+
+set.seed(123)
+kmeans = kmeans(survey_data3[,c(2,3,4,5, 6,7)], 5)
+survey_data3$cluster = kmeans$cluster
+
+train_model_data2 = train_model_data %>% left_join(survey_data3 %>% dplyr::select(response_id,cluster),on = c("response_id"="response_id"))
+test_model_data2 = test_model_data %>% left_join(survey_data3 %>% dplyr::select(response_id,cluster),on = c("response_id"="response_id"))
+
+# The run-time for training of the below model is too long & I saved the model coefficients & information in the ./data folder
+# model7 = clmm(answer~duration+offer+outcome+price+rtb+social_proof+(1|cluster),
+#                link='logit',
+#                data= exp_data2 %>%
+#                  mutate(answer = ordered(answer, levels = c("1", "2", "3","4"))),
+#                Hess=TRUE, nAGQ=1)
+# summary(model7)
+
+data("model7_info")
+data("model7_coef")
+
+model7_coef
+model7_info
+```
+
+# Group Lasso
