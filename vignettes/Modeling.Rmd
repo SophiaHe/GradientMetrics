@@ -20,6 +20,7 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(GradientMetrics)
 library(tidyverse)
+library(data.table)
 library(MASS,exclude = "select")
 library(ordinal)
 # library(glmmLasso)
@@ -364,8 +365,7 @@ model7 = clmm(answer~duration+offer+outcome+price+rtb+social_proof+(1|cluster_so
                data= train_model_data2,
                Hess=TRUE, nAGQ=1)
 summary(model7) # AIC = 21757.87
-ctable = coef(summary(model7))
-ctable
+
 ```
 
 **Interpretation of the model results:**
@@ -400,20 +400,71 @@ data.frame(
 **Overall, the model performance of all 3 models are summarized below: the ordinal mixed effect model using source cluster as random effect variable yields the smallest number of in-sample AIC.**
 
 ```{r}
-data.frame(
+aic = data.frame(
   model = c("Multinomial Logistic Regression", "Ordinal Logistic Regression", "Ordinal Mixed Effect Model"),
   AIC = c(round(summary(mlr)$AIC,2),
           round(olr$deviance,2),
           summary(model7)$info["AIC"] %>% pull())
-  
 )
+knitr::kable(aic, format = "html",align = "c")
+
 
 ```
 
-## Future Improvement
-Ideally, a K-folder cross validation should be use to train, validate and test the model, where out-of-sample performance metrics can be calculated to evaluate the accuracy of the predictions.
+```{r}
 
-Group Lasso
+# multinomial model
+ctable <- coef(summary(mlr))
+mlr_info = setDT(ctable[1,1:19] %>% as.data.frame(),keep.rownames = T)[] %>% 
+  dplyr::rename("Variables"="rn","MLR Coefficients"=".")
+z <- summary(mlr)$coefficients/summary(mlr)$standard.errors
+p <- (1 - pnorm(abs(z), 0, 1)) * 2
+p_values_mlr = setDT(p[1,1:19] %>% as.data.frame(),keep.rownames = T)[] %>% 
+  dplyr::rename("Variables"="rn","MLR P Value"=".")
+mlr_coeffs = mlr_info %>% 
+  left_join(p_values_mlr, on = c("Variables"="Variables"))
+
+# ordinal model
+ctable <- coef(summary(olr))
+p <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+ctable <- cbind(ctable, "p value" = p)
+olr_coeffs = setDT(ctable[1:18,c(1,4)] %>% as.data.frame(), keep.rownames = T)[] %>% 
+  dplyr::rename("Variables"="rn","OLR Coefficients"="Value","OLR P Values"="p value")
+
+# ordinal mixed effect model
+ctable = coef(summary(model7))
+clmm_coeffs = setDT(ctable[4:21,c(1,4)] %>% as.data.frame(),keep.rownames = T)[] %>% 
+  dplyr::rename("Variables"="rn","CLMM Coefficients"="Estimate","CLMM P Values"="Pr(>|z|)")
+
+model_coefficients <- mlr_coeffs %>% 
+  left_join(olr_coeffs,on = c("Variables"="Variables")) %>% 
+  left_join(clmm_coeffs,on = c("Variables"="Variables"))
+model_coefficients[,2:7] = round(model_coefficients[,2:7],2)
+col_order <- c("Variables", "MLR Coefficients", "OLR Coefficients",
+               "CLMM Coefficients", "MLR P Value","OLR P Values","CLMM P Values")
+model_coefficients = as.data.frame(model_coefficients)
+model_coefficients <- model_coefficients[, col_order]
+
+knitr::kable(model_coefficients, format = "html",align = "c", digits = 3)
+```
+## Future Improvement
+There are many areas of improvement that can be done as future work:
+
+* Ideally, a K-folder cross validation should be use to train, validate and test the model, where out-of-sample performance metrics can be calculated to evaluate the accuracy of the predictions.
+
+* More sophisticated clustering method can be use to generate random effect variable, when training mixed effect models. 
+
+* There are many interesting features from the survey_data and using them as predictors in building statistical model to estimate download likelihood could be another area to explore. Note that regularized techniques should be used, since there are 100 socia-demographic variables available in the data. One particular approach that is worth noting is called group Lasso, which is a generalization of the lasso for doing group-wise variable selection. For a particular categorical variable, when expanded into sparse matrix form, general logistics regression (ordinal, multinomial, CLMM) will produce variable significance for each individual level (e.g. duration = 6 months is a statistically significant variable at 5% level, while duration = 12 months is NOT). However, when interpreting the model estimates, the previous explanation does not make much sense. Group lasso can solve this issue by specifying which columns are within a single group (duration = 3, 6, 12 months ) and shrink the estimates of those 3 together. In this way, the significance of variables can be explained by group. 
+
+## Appendix
+```{r}
+print("Multinomial Logistic Regression Model Summary: ")
+summary(mlr)
+print("Ordinal Logistic Regression Model Summary: ")
+summary(olr)
+print("CLMM Model Summary: ")
+summary(model7)
+```
 
 ## Reference
 https://stats.idre.ucla.edu/r/dae/multinomial-logistic-regression/

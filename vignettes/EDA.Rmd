@@ -56,8 +56,6 @@ GradientMetrics::pie_chart(data = dem_data,
 ```
 
 
-
-
 ```{r}
 GradientMetrics::pie_chart(data = dem_data,
                   var = "s_race",
@@ -141,7 +139,7 @@ survey_awareness <-
   survey_data %>%
   dplyr::select(response_id, contains('m2_awareness'))
 # participants all selected at lease 1 option
-survey_awareness %>% filter_all(all_vars(is.na(.))) # 0 row
+# survey_awareness %>% filter_all(all_vars(is.na(.))) # 0 row
 
 apps_names = c()
 end_range = ncol(survey_awareness)-1
@@ -176,13 +174,168 @@ hc
 
 ### Source & Solutions Module
 
+```{r,echo = FALSE}
+survey_data3 = survey_data
+survey_data3[is.na(survey_data3)] <- 0
+
+survey_source <-
+  survey_data3 %>%
+  dplyr::select(response_id, contains('source'))
+
+apps_names = c()
+end_range = ncol(survey_source)-1
+for(i in 1:end_range){
+  apps_names[i]=setDT(val_labels(survey_source[i+1]) %>% data.frame(),
+                     keep.rownames = TRUE)[]$`rn`
+}
+source_counts = colSums(survey_source[2:ncol(survey_source)],na.rm = T) %>%
+  as.data.frame() %>%
+  mutate(Sources_Names = apps_names)
+source_counts = setDT(source_counts, keep.rownames = TRUE)[] %>%
+  rename("Source"="rn", "count"=".") %>%
+  arrange(desc(count))
+
+data_list = list()
+for(i in 1:nrow(source_counts)){
+  data_list[[i]] = list(y=source_counts$count[i], name = source_counts$Sources_Names[i])
+}
+hc = highchart() %>%
+  hc_title(text = "What are the common sources of sleep issues") %>%
+  hc_chart(type = "pie") %>%
+  hc_add_series(name = 'Proportion', innerSize = '60%',
+                data= data_list) %>%
+  hc_tooltip(enable=TRUE,pointFormat = "{series.name}:<b>{point.percentage:.1f}%</b>") %>%
+  hc_plotOptions(pie=list(
+    allowPointSelect=TRUE,
+    cursor='pointer',
+    dataLabels=list(enable=FALSE)
+  ))
+hc
+```
+
 ### Behavioral questions
+```{r,echo = FALSE}
+survey_behavior <-
+  survey_data3 %>%
+  dplyr::select(response_id, behavior_1,behavior_4,behavior_5,
+                behavior_6,behavior_7,behavior_8,behavior_9,behavior_10,
+                behavior_11,behavior_12,behavior_13,behavior_14,behavior_15,
+                behavior_16
+                )
+
+apps_names = c()
+end_range = ncol(survey_behavior)-1
+for(i in 1:end_range){
+  apps_names[i]=setDT(val_labels(survey_behavior[i+1]) %>% data.frame(),
+                     keep.rownames = TRUE)[]$`rn`
+}
+behavior_counts = colSums(survey_behavior[2:ncol(survey_behavior)],na.rm = T) %>%
+  as.data.frame() %>%
+  mutate(Behavior_Names = apps_names)
+behavior_counts = setDT(behavior_counts, keep.rownames = TRUE)[] %>%
+  rename("Behavior"="rn", "count"=".") %>%
+  arrange(desc(count))
+
+data_list = list()
+for(i in 1:nrow(behavior_counts)){
+  data_list[[i]] = list(y=behavior_counts$count[i], name = behavior_counts$Behavior_Names[i])
+}
+hc = highchart() %>%
+  hc_title(text = "What are the common steps participants took to improve sleep quality") %>%
+  hc_chart(type = "pie") %>%
+  hc_add_series(name = 'Proportion', innerSize = '60%',
+                data= data_list) %>%
+  hc_tooltip(enable=TRUE,pointFormat = "{series.name}:<b>{point.percentage:.1f}%</b>") %>%
+  hc_plotOptions(pie=list(
+    allowPointSelect=TRUE,
+    cursor='pointer',
+    dataLabels=list(enable=FALSE)
+  ))
+hc
+```
+
 
 ### Other questions related to source and solutions
 
+How interested are you in trying cognitive behavior therapy?
+```{r,echo = FALSE}
+survey_others = survey_data %>%
+    select(response_id, interst_cbt:interest_coach)
+
+GradientMetrics::pie_chart(data = survey_others,
+                  var = "interst_cbt",
+                  var_levels = c(1,2,3,4,5),
+                  var_level_names = c("Very interested","Somewhat interested","Neither interested nor uninterested","Somewhat uninterested","Very uninterested"))
+```
+
+Have you ever worked with a professional coach to improve your health or well-being (e.g., nutritionist, personal trainer, life coach, career coach, etc.)?
+```{r,echo = FALSE}
+GradientMetrics::pie_chart(data = survey_others,
+                  var = "past_coach",
+                  var_levels = c(1,2,3),
+                  var_level_names = c("Yes","No","I am not sure"))
+```
+
+
+```{r,echo = FALSE}
+survey_others = survey_data %>%
+    select(response_id, interst_cbt:interest_coach)
+
+GradientMetrics::pie_chart(data = survey_others,
+                  var = "past_coach",
+                  var_levels = c(1,2,3,4,5),
+                  var_level_names = c("Very interested","Somewhat interested","Neither interested nor uninterested","Somewhat uninterested","Very uninterested"))
+```
+
+
+
+How interested are you in working with a professional coach to improve your health or well-being (e.g., nutritionist, personal trainer, life coach, career coach, etc.)?
+```{r,echo = FALSE}
+GradientMetrics::pie_chart(data = survey_others,
+                  var = "interest_coach",
+                  var_levels = c(1,2,3,4,5),
+                  var_level_names = c("Very interested","Somewhat interested","Neither interested nor uninterested","Somewhat uninterested","Very uninterested"))
+```
+
+### Highly downloaders
+The following charts summarise the features of highly downloaders, which is defined as having a rating = 1/Very Likely to donwload to all 12 questions. 
+```{r,echo=FALSE}
+highly_dl = exp_data %>% 
+  group_by(response_id) %>% 
+  summarise(avg_rating = mean(answer)) %>% 
+  filter(avg_rating == 1)
+
+survey_data_highly_dl = survey_data %>% 
+  left_join(highly_dl, on= c("response_id" = "response_id"))
+
+GradientMetrics::pie_chart(data = survey_data_highly_dl,
+                  var = "d_urban",
+                  var_levels = c(1,2,3),
+                  var_level_names = c("Urban","Suburban","Rural")) %>% 
+  hc_subtitle(text = paste0(nrow(highly_dl)," highly likely downloaders"))
+```
+
+```{r}
+GradientMetrics::pie_chart(data = survey_data_highly_dl,
+                           var = "d_education",
+                           var_levels = setDT(val_labels(survey_data$d_education) %>% data.frame(), keep.rownames = TRUE)[]$`.`,
+                           var_level_names = setDT(val_labels(survey_data$d_education) %>% data.frame(), keep.rownames = TRUE)[]$`rn`
+                            )%>% 
+  hc_subtitle(text = paste0(nrow(highly_dl)," highly likely downloaders"))
+```
+
+
+```{r}
+GradientMetrics::pie_chart(data = survey_data_highly_dl,
+                  var = "s_race",
+                  var_levels = c(1,2,3,4,5),
+                  var_level_names = c("White","African American/Black/Caribbean American","Asian or Pacific Islander","Mixed race and other","Hispanic or Latino"))%>% 
+  hc_subtitle(text = paste0(nrow(highly_dl)," highly likely downloaders"))
+```
+
 ### Experiment Data
 The following plots outline the distribution of rating for each attribute. For instance, the following plot shows that 43.8% of rating is "Very Likely to Download" when Duration message is "12 months" and 15.2% of rating is "Very Unlikely to Download" when Duration message is "12 months". 
-```{r}
+```{r,echo=FALSE}
 employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "duration",
                         index_var = "answer") %>% 
@@ -193,7 +346,7 @@ GradientMetrics::dist_bar_chart(data = employment_age,
                title = "Rating Distribution by duration")
 ```
 
-```{r}
+```{r,echo=FALSE}
 employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "price",
                         index_var = "answer") %>% 
@@ -204,7 +357,7 @@ GradientMetrics::dist_bar_chart(data = employment_age,
                title = "Rating Distribution by price")
 ```
 
-```{r}
+```{r,echo=FALSE}
 employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "offer",
                         index_var = "answer") %>% 
@@ -216,7 +369,7 @@ GradientMetrics::dist_bar_chart(data = employment_age,
 ```
 
 
-```{r}
+```{r,echo=FALSE}
 employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "outcome",
                         index_var = "answer") %>% 
@@ -227,7 +380,7 @@ GradientMetrics::dist_bar_chart(data = employment_age,
                title = "Rating Distribution by outcome")
 ```
 
-```{r}
+```{r,echo=FALSE}
 employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "rtb",
                         index_var = "answer") %>% 
@@ -238,7 +391,7 @@ GradientMetrics::dist_bar_chart(data = employment_age,
                title = "Rating Distribution by rtb")
 ```
 
-```{r}
+```{r,echo=FALSE}
 employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "social_proof",
                         index_var = "answer") %>% 
@@ -250,8 +403,5 @@ GradientMetrics::dist_bar_chart(data = employment_age,
 ```
 
 
-```{r}
-exp_data %>% group_by(duration, offer , outcome , price,rtb,social_proof) %>% summarise(n = n(),
-                                      avg_rating = mean(answer))
-```
+
 
