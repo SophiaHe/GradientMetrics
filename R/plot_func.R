@@ -24,7 +24,7 @@ dist_bar_chart_dataPrep <- function(data,grouping_var,index_var){
       mutate(grouping_var = levels[i])
   }
   output = bind_rows(group_lvl)%>%
-    rename("index_var"="grouped_index_var") %>%
+    dplyr::rename("index_var"="grouped_index_var") %>%
     pivot_wider(names_from = index_var,values_from = Freq)
   return(output)
 }

@@ -24,12 +24,12 @@ index_func <- function(data,grouping_var,index_var){
       mutate(grouping_var = levels[i]) %>%
       left_join(grouping_var_tbl, by = c("grouping_var"="group")) %>%
       mutate(index = (Freq.x/Freq.y)*100) %>%
-      rename("index_var_perc"="Freq.x",
+      dplyr::rename("index_var_perc"="Freq.x",
              "grouping_var_perc"="Freq.y",
              "index_var"="grouped_index_var")
   }
   output = bind_rows(group_lvl) %>%
-    select(index_var,grouping_var,index)
+    dplyr::select(index_var,grouping_var,index)
   return(output)
 }
 
