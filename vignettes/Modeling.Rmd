@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-library(GradientMatricsSubmission)
+library(GradientMetrics)
 # library(dplyr)
 library(tidyverse)
 library(MASS)
@@ -165,16 +165,16 @@ conf_mat <- confusion_matrix(targets = mlr_predictions$actual,
 plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]],
                       add_sums = TRUE)
 print("accuracy")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[1]] # accuracy:0.4714419
 print("precision")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[2]] # precision
 print("recall")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[3]] # recall
 print("F1 score")
-GradientMatricsSubmission::model_performance_metrics(predictions = mlr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = mlr_predictions$prediction,
                           targets = mlr_predictions$actual)[[4]] # f1
 ```
 
@@ -258,16 +258,16 @@ conf_mat <- confusion_matrix(targets = olr_predictions$actual,
 plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]],
                       add_sums = TRUE)
 print("Accuracy")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[1]] # accuracy:0.4274345
 print("Precision")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[2]] # precision
 print("Recall")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[3]] # recall
 print("F1 Score")
-GradientMatricsSubmission::model_performance_metrics(predictions = olr_predictions$prediction,
+GradientMetrics::model_performance_metrics(predictions = olr_predictions$prediction,
                           targets = olr_predictions$actual)[[4]] # f1
 ```
 Similar to multinomial regression model, the ordinal model has little power in distinguishing likelihood of donwload based on message attributes. Possible explanations include the unbalanced distribution of the rating, outlined below, where more than half the participants gave rating = 1 in their answers.
@@ -279,11 +279,11 @@ Another reason is that the ability of each predictor to distinguish different ra
 ```{r, echo=FALSE}
 data("experiment_data")
 
-employment_age = GradientMatricsSubmission::dist_bar_chart_dataPrep(data= exp_data,
+employment_age = GradientMetrics::dist_bar_chart_dataPrep(data= exp_data,
                         grouping_var = "duration",
                         index_var = "answer") %>% 
   mutate(grouping_var2 = grouping_var)
-GradientMatricsSubmission::dist_bar_chart(data = employment_age,
+GradientMetrics::dist_bar_chart(data = employment_age,
                index_var_names = "Duration ",
                index_var_levels = c("Very Likely","Somewhat Likely","Somewhat Unlikely","Very Unlikely"),
                title = "Rating Distribution by duration")
