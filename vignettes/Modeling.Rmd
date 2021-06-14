@@ -52,27 +52,13 @@ model_data = exp_data %>%
   ) %>% 
   dplyr::select(-c(task)) #response_id
 
-# merge categories in response variable
-# model_data2 = model_data %>% 
-#   mutate(answer = case_when(
-#     answer == 1 ~ 1,
-#     answer %in% c(2,3) ~ 2,
-#     answer == 4 ~ 3
-#   ),
-#   answer =  ordered(answer, levels = c("1", "2", "3")),
-#   duration = factor(duration,levels = c("3 months","6 months","12 months")),
-#   price = factor(price,levels = c("$20/month","$30/month","$40/month"))
-#   )
-# 
-# table(model_data2$answer)
-# # 3 levels
 IDs = unique(model_data$response_id)
 set.seed(123)
 train_model_data = model_data %>%
   filter(response_id %in% sample(IDs,round(0.8*length(IDs),0)))
 test_model_data = model_data %>%
   filter(!(response_id %in% sample(IDs,round(0.8*length(IDs),0))))
-# str(model_data2$duration)
+
 ```
 
 I splitted the entire experiment data into training and testing set, by randomly select 80% of the participants into training dataset and the remaining 20% of the participants to the testing dataset. This is equivalent to a 1-folder validation, where I can train the model on the training set and evaluate the performance of the model on the testing set. 
@@ -177,7 +163,7 @@ GradientMetrics::model_performance_metrics(predictions = mlr_predictions$predict
                           targets = mlr_predictions$actual)[[4]] # f1
 ```
 
-As we can see, the model has little power in distinguishing likelihood of donwload based on message attributes using a multinomial model. More details is discussed in Section Further Improvement. 
+As we can see, the model has little power in distinguishing likelihood of donwload based on message attributes using a multinomial model. More details is discussed in Section Future Improvement. 
 
 # Ordinal Logistic Regression Model
 Ordinal logistic regression is used to determine the relationship between a set of predictors and an ordered factor dependent variable (such as rating). In ordinal logistic regression, the levels within the dependent variable is assumed to have a ordinal features, such as rating 1 is one-step higher than rating 2, and it's 2-step higher than rating 3. In contrast to multinomial regression, where there is NO ordinal structure for the levels within the dependent variable (such as y %in% c("apple","orange","pear")).
@@ -239,7 +225,7 @@ sum(olr_predictions$match)/nrow(olr_predictions) # 0.4274345 (0.4639513 3-level)
   and same amount of changes will happen to the likelihood of a rating 3 vs. a rating 1-2 \& the likelihood of a rating 2 vs. a rating 1
 
 Similar interpretation can be generated for the remaining of the predictors. The baseline level for each categorical variables are the following:
-```{r}
+```{r, echo=FALSE}
 data.frame(
   Predictors = c("duration","offer","outcome","price","rtb","social_proof"),
   Baseline_Level = c("3 months","give you the energy to unlock your fullest potential",
@@ -251,7 +237,7 @@ data.frame(
 
 **Model Performance:**
 Confusion matrix of the multinomial model is presented below, along with out-of-sample accuracy, precision, recall and F1 score: 
-```{r}
+```{r, echo=FALSE}
 conf_mat <- confusion_matrix(targets = olr_predictions$actual,
                              predictions = olr_predictions$prediction)
 plot_confusion_matrix(conf_mat$`Confusion Matrix`[[1]],
@@ -334,18 +320,6 @@ test_model_data2 = test_model_data %>%
     price = factor(price,levels = c("$20/month","$30/month","$40/month"))
   )
 
-# fitLCA <- function(k){
-#   poLCA(cbind(m1_philosophy_1, m1_philosophy_2, m1_philosophy_3,
-#                    m1_philosophy_4, m1_philosophy_5, m1_philosophy_6,
-#                    m1_philosophy_7, m1_philosophy_8, m1_philosophy_9)~1, 
-#         data=survey_data, nclass = k, nrep=10)
-# }
-# # Apply the function to successively increasingly classes K=1,2,3....,6
-# MK <- lapply(1:6, fitLCA)
-# # Possible to look at AIC, BIC, etc.
-# sapply(MK, `[[`, "aic")
-# sapply(MK, `[[`, "bic")
-
 ```
 
 As we can see from the visualization above, for the 3 clusters the model defined: 
@@ -387,7 +361,7 @@ summary(model7) # AIC = 21757.87
   and same amount of changes will happen to the likelihood of a rating 3 vs. a rating 1-2 \& the likelihood of a rating 2 vs. a rating 1
 
 Similar interpretation can be generated for the remaining of the predictors. The baseline level for each categorical variables are the following:
-```{r}
+```{r, echo=FALSE}
 data.frame(
   Predictors = c("duration","offer","outcome","price","rtb","social_proof"),
   Baseline_Level = c("3 months","give you the energy to unlock your fullest potential",
@@ -399,7 +373,7 @@ data.frame(
 
 **Overall, the model performance of all 3 models are summarized below: the ordinal mixed effect model using source cluster as random effect variable yields the smallest number of in-sample AIC.**
 
-```{r}
+```{r, echo=FALSE}
 aic = data.frame(
   model = c("Multinomial Logistic Regression", "Ordinal Logistic Regression", "Ordinal Mixed Effect Model"),
   AIC = c(round(summary(mlr)$AIC,2),
@@ -411,7 +385,7 @@ knitr::kable(aic, format = "html",align = "c")
 
 ```
 
-```{r}
+```{r, echo=FALSE}
 
 # multinomial model
 ctable <- coef(summary(mlr))
